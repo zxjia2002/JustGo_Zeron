@@ -1,8 +1,14 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
+	"os"
+	"os/exec"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -59,6 +65,25 @@ func (u user) checkPassword(pwd string) bool {
 // 注意指针的使用
 func (u *user) resetPassword(pwd string) {
 	u.pwd = pwd
+}
+
+// 错误处理 - 使用返回值来处理错误信息
+// 显式呈现具体出现错误的函数，并且支持if else 处理错误
+
+func findUser(users []user, name string) (v *user, err error) {
+	for _, u := range users {
+		if u.name == name {
+			return &u, nil // 无错误出现时的返回值
+		}
+	}
+	return nil, errors.New("not found") // 发生错误时的返回值
+}
+
+// JSON 操作
+type userInfo struct { // 如果想转为json格式每个字段名称首字母要大写
+	Name  string
+	Age   int `json:"age"` // 加入该tag可以在转为json格式后让字段全部为小写
+	Hobby []string
 }
 
 func main() {
@@ -364,6 +389,162 @@ func main() {
 
 	fmt.Println("===============")
 
+	// 2025年3月19日11:08:55
 	// 错误处理
+	get_user, err := findUser([]user{{"wang", "1024"}}, "wang")
+	// nil类似于NULL, None即表示空
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(get_user.name)
+
+	if u, err := findUser([]user{{"wang", "1024"}}, "li"); err != nil {
+		// fmt.Println(u.name) // 空指针错误 x↓
+		// panic: runtime error: invalid memory address or nil pointer dereference
+		// [signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x49aaf1]
+
+		fmt.Println(err)
+		// return
+	} else {
+		fmt.Println(u.name)
+	}
+	// 感觉更像是logger一样的参与者，而非关键字
+
+	fmt.Println("===============")
+
+	// 丰富的字符串操作
+	test_s := "hello"
+	fmt.Println(strings.Contains(test_s, "ll"))           // 包含
+	fmt.Println(strings.Count(test_s, "l"))               // 计数
+	fmt.Println(strings.HasPrefix(test_s, "he"))          // 判断是否以该前缀开头
+	fmt.Println(strings.HasSuffix(test_s, "llo"))         // 同上
+	fmt.Println(strings.Index(test_s, "ll"))              // 定位 返回类似数组索引
+	fmt.Println(strings.Join([]string{"he", "llo"}, "-")) // 类似python中的.join
+	fmt.Println(strings.Repeat(test_s, 2))                // 重复输出
+	test_s = strings.Replace(test_s, "e", "E", -1)
+	fmt.Println(test_s)                      // 替换 最后一个参数-1表示全部替换，n>0表示替换n次
+	fmt.Println(strings.Split("a-b-c", "-")) // 类似python中的.split,返回一个包含所有子字符串的切片
+	fmt.Println(strings.ToLower(test_s))
+	fmt.Println(strings.ToUpper(test_s))
+	fmt.Println(len(test_s))
+	test_ch := "你好啊！"
+	fmt.Println(len(test_ch)) // 基本每个中文字符都计为3个
+
+	fmt.Println("===============")
+
+	// 丰富的字符串格式化输出
+	mix_s := "can ouput"
+	mix_num := 12.33
+	fmt.Println(mix_s, mix_num) // 最为常用
+
+	output_user := user{"wang", "2048"}
+	// 类似于C语言中的Printf但是仅需使用%v作为占位符即可适用所有变量类型
+	fmt.Printf("mix_s=%v\n", mix_s) // mix_num 同理
+
+	fmt.Printf("user=%v\n", output_user)
+	fmt.Printf("output_user=%+v\n", output_user) // 详细数据，包含字段名称
+	fmt.Printf("output_user=%#v\n", output_user) // 更详细数据，进一步包含构造名称
+
+	op_f := 3.1415926535
+	fmt.Println(op_f)
+	fmt.Printf("%.2f\n", op_f) // 同样支持使用%.几f来格式化浮点数小数位
+
+	fmt.Println("===============")
+
+	// 简单易用的JSON处理
+
+	json_user := userInfo{Name: "wang", Age: 18, Hobby: []string{"Golang", "TypeScript"}}
+
+	buf, err := json.Marshal(json_user) // 序列化
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(buf) //地址编码
+	fmt.Println(string(buf))
+
+	buf, err = json.MarshalIndent(json_user, "", "\t") // 美观输出
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(buf))
+
+	var get_json userInfo
+	err = json.Unmarshal(buf, &get_json) // 解序列化 json->结构体
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("%v\n", get_json)
+
+	fmt.Println("===============")
+
+	// 时间处理
+
+	now := time.Now()
+	fmt.Println(now)
+
+	t1 := time.Date(2025, 3, 19, 11, 11, 11, 0, time.UTC) // 指定时间
+	t2 := time.Date(2025, 3, 19, 12, 12, 12, 0, time.Local)
+
+	fmt.Println(t1)
+	fmt.Println(t2)
+
+	fmt.Println(t1.Year(), t1.Month(), t1.Day(), t1.Hour(), t1.Minute(), t1.Second())
+	// Golang格式化时间的特殊方式
+	fmt.Println(t1.Format("02/01/2006 15:04:05")) // 格式化输出
+
+	// 时间段
+	diff := t2.Sub(t1)
+	fmt.Println(diff)
+	fmt.Println(diff.Hours(), diff.Minutes(), diff.Seconds()) // 换算成不同时间单位
+	// 也可以解结构化时间到常规时间变量
+	t3, time_err := time.Parse("2006-01-02 15:04:05", "2025-03-19 11:11:11")
+	fmt.Println(t3)
+	if time_err != nil {
+		panic(time_err)
+	}
+	fmt.Println(t3 == t1)
+
+	fmt.Println(now.Unix()) // 时间戳
+
+	fmt.Println(now.UnixMilli()) // 毫秒时间戳
+
+	fmt.Println("=================")
+
+	// 字符串与数字解析
+
+	str2f, _ := strconv.ParseFloat("3.1415926535", 64) // 64位精度
+	fmt.Println(str2f)
+
+	n1, _ := strconv.ParseInt("123", 10, 64) // 10进制,64精度，字符串解析成整型
+	fmt.Println(n1)
+
+	// n1, _ = strconv.ParseInt("1000", 16, 64) 16进制-1000
+	n1, _ = strconv.ParseInt("0x1000", 0, 64) // 0表示自动判断进制，64精度
+	fmt.Println(n1)
+
+	n2, _ := strconv.Atoi("123") // 字符串变整型
+	fmt.Println(n2)
+
+	n3 := strconv.Itoa(n2) // 整型变字符串
+	fmt.Println(n3)
+
+	n4, con_err := strconv.Atoi("AAA") // 会报错, 不是数字字符串
+	fmt.Println(n4, con_err)
+
+	// 获取进程信息
+	// go run example/20-env/main.go a b c d
+	fmt.Println(os.Args) // 返回一个切片，第一个元素是可执行文件目前的绝对地址，然后是运行程序后面附加的命令指令信息
+	// 获取及写入 环境变量
+	fmt.Println(os.Getenv("PATH")) // /usr/local/go/bin...
+	fmt.Println(os.Setenv("AA", "BB"))
+
+	// exec.Command 快速启动子进程
+	// 下面这行就是启动子进程运行命令行指令然后获取命令行的输出（同样也可以获得输入）
+	os_buf, os_err := exec.Command("grep", "127.0.0.1", "/etc/hosts").CombinedOutput()
+	if os_err != nil {
+		panic(os_err)
+	}
+	fmt.Println(string(os_buf)) // 127.0.0.1       localhost
 
 }
